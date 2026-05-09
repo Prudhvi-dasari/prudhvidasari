@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+<title>Blog Admin — Prudhvi</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<script src="blogs-data.js"></script>
+<script src="firebase-config.js"></script>
+<script src="firebase-blog.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#020917;--bg2:#040e22;--surface:rgba(255,255,255,.05);--border:rgba(255,255,255,.09);--text:#e2eaff;--muted:#6b7faa;--accent:#1d6ef5;--accent2:#60a5fa;--green:#22c55e;--red:#ef4444;--radius:14px;--font:'Outfit',sans-serif;--mono:'JetBrains Mono',monospace}
+body{background:var(--bg);color:var(--text);font-family:var(--font);min-height:100vh}
+/* LOGIN */
+#loginScreen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:999;flex-direction:column;gap:24px}
+.login-box{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:48px;width:100%;max-width:400px;text-align:center}
+.login-box h1{font-size:1.8rem;font-weight:800;margin-bottom:8px}.login-box p{color:var(--muted);margin-bottom:32px;font-size:.9rem}
+.login-box input{width:100%;background:rgba(255,255,255,.05);border:1px solid var(--border);color:var(--text);padding:14px 18px;border-radius:10px;font-family:var(--font);font-size:1rem;outline:none;margin-bottom:16px;letter-spacing:3px}
+.login-box input:focus{border-color:var(--accent)}
+.login-err{color:var(--red);font-size:.85rem;margin-top:-8px;margin-bottom:12px;display:none}
+/* LAYOUT */
+#app{display:none;min-height:100vh}
+.topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 32px;height:60px;display:flex;align-items:center;justify-content:space-between;position:sticky;top:0;z-index:10}
+.topbar-logo{font-size:1.1rem;font-weight:800;letter-spacing:-1px}.dot{color:var(--accent2)}
+.topbar-right{display:flex;gap:12px;align-items:center}
+.topbar-right a{color:var(--muted);font-size:.85rem;text-decoration:none}.topbar-right a:hover{color:var(--text)}
+.wrap{display:grid;grid-template-columns:300px 1fr;min-height:calc(100vh - 60px)}
+/* SIDEBAR */
+.sidebar{background:var(--bg2);border-right:1px solid var(--border);padding:24px;display:flex;flex-direction:column;gap:16px}
+.sidebar-head{display:flex;align-items:center;justify-content:space-between}
+.sidebar-head h2{font-size:.85rem;color:var(--muted);font-family:var(--mono);letter-spacing:2px;text-transform:uppercase}
+.post-list{display:flex;flex-direction:column;gap:8px;flex:1;overflow-y:auto}
+.post-item{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px 16px;cursor:pointer;transition:all .2s}
+.post-item:hover,.post-item.active{border-color:rgba(29,110,245,.4);background:rgba(29,110,245,.07)}
+.post-item-title{font-size:.9rem;font-weight:600;margin-bottom:4px;line-height:1.3}
+.post-item-meta{font-size:.75rem;color:var(--muted);font-family:var(--mono);display:flex;gap:8px}
+.post-item-del{margin-left:auto;background:none;border:none;color:var(--muted);cursor:pointer;font-size:.85rem;padding:2px 6px;border-radius:6px;transition:all .2s}
+.post-item-del:hover{background:rgba(239,68,68,.15);color:var(--red)}
+.sidebar-empty{color:var(--muted);font-size:.85rem;text-align:center;padding:32px 0}
+/* EDITOR */
+.editor-area{padding:32px;display:flex;flex-direction:column;gap:20px;overflow-y:auto}
+.editor-title{font-size:1.1rem;font-weight:700;margin-bottom:4px}
+.field-row{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px}
+.field{display:flex;flex-direction:column;gap:6px}
+.field label{font-size:.78rem;color:var(--muted);text-transform:uppercase;letter-spacing:1px;font-family:var(--mono)}
+.field input,.field select,.field textarea{background:rgba(255,255,255,.04);border:1px solid var(--border);color:var(--text);padding:10px 14px;border-radius:10px;font-family:var(--font);font-size:.95rem;outline:none;transition:border-color .2s}
+.field input:focus,.field select:focus,.field textarea:focus{border-color:var(--accent)}
+.field select option{background:var(--bg2)}
+.field-full{grid-column:1/-1}
+/* RICH TEXT EDITOR */
+.editor-toolbar{display:flex;gap:4px;flex-wrap:wrap;background:rgba(255,255,255,.04);border:1px solid var(--border);border-bottom:none;border-radius:10px 10px 0 0;padding:8px 12px}
+.tb-btn{background:none;border:1px solid transparent;color:var(--muted);padding:5px 10px;border-radius:6px;cursor:pointer;font-size:.85rem;font-family:var(--font);transition:all .2s;font-weight:600}
+.tb-btn:hover{background:rgba(29,110,245,.15);border-color:rgba(29,110,245,.3);color:var(--accent2)}
+.tb-sep{width:1px;background:var(--border);margin:0 4px}
+.content-editable{background:rgba(255,255,255,.04);border:1px solid var(--border);border-radius:0 0 10px 10px;padding:20px;min-height:380px;outline:none;font-size:1rem;line-height:1.8;color:var(--text)}
+.content-editable:focus{border-color:var(--accent)}
+.content-editable h2{font-size:1.4rem;font-weight:700;margin:24px 0 8px;color:var(--text)}
+.content-editable h3{font-size:1.1rem;font-weight:700;margin:16px 0 6px;color:var(--text)}
+.content-editable p{margin-bottom:12px;color:#c8d4f0}
+.content-editable ul,.content-editable ol{padding-left:24px;margin-bottom:12px}
+.content-editable li{margin-bottom:6px}
+.content-editable strong{color:var(--accent2)}
+.content-editable blockquote{border-left:3px solid var(--accent);padding:12px 18px;background:rgba(29,110,245,.07);border-radius:0 8px 8px 0;margin:16px 0}
+.content-editable code{background:rgba(255,255,255,.07);padding:2px 6px;border-radius:4px;font-family:var(--mono);font-size:.88em;color:#38bdf8}
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:8px;padding:11px 24px;border-radius:100px;font-size:.9rem;font-weight:600;font-family:var(--font);border:none;cursor:pointer;transition:all .2s}
+.btn-blue{background:linear-gradient(135deg,var(--accent),#0ea5e9);color:#fff}.btn-blue:hover{box-shadow:0 8px 24px rgba(29,110,245,.4);transform:translateY(-1px)}
+.btn-ghost{background:transparent;color:var(--text);border:1px solid var(--border)}.btn-ghost:hover{border-color:var(--accent2);color:var(--accent2)}
+.btn-green{background:linear-gradient(135deg,#16a34a,var(--green));color:#fff}.btn-green:hover{box-shadow:0 8px 24px rgba(34,197,94,.3)}
+.btn-new{width:100%;justify-content:center;background:rgba(29,110,245,.1);border:1px dashed rgba(29,110,245,.3);color:var(--accent2);border-radius:10px;padding:12px}
+.btn-new:hover{background:rgba(29,110,245,.15)}
+.action-bar{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.save-status{font-size:.82rem;color:var(--green);font-family:var(--mono);opacity:0;transition:opacity .3s}
+.save-status.show{opacity:1}
+.preview-frame{background:rgba(255,255,255,.03);border:1px solid var(--border);border-radius:var(--radius);padding:32px;line-height:1.8;display:none}
+.preview-frame h2{font-size:1.4rem;font-weight:700;margin:24px 0 8px}
+.preview-frame p{color:#c8d4f0;margin-bottom:12px}
+.preview-frame ul,.preview-frame ol{padding-left:24px;margin-bottom:12px}
+.toast{position:fixed;bottom:32px;right:32px;background:var(--green);color:#fff;padding:14px 24px;border-radius:100px;font-size:.9rem;font-weight:600;transform:translateY(80px);opacity:0;transition:all .4s;z-index:999}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.error{background:var(--red)}
+.char-count{font-size:.75rem;color:var(--muted);font-family:var(--mono);text-align:right;margin-top:4px}
+@media(max-width:900px){.wrap{grid-template-columns:1fr}.sidebar{display:none}.field-row{grid-template-columns:1fr 1fr}}
+</style>
+</head>
+<body>
+
+<!-- LOGIN -->
+<div id="loginScreen">
+  <div class="login-box">
+    <h1>PRUDHVI<span class="dot">.</span></h1>
+    <p>Blog Admin Panel — Enter password to continue</p>
+    <input type="password" id="pwInput" placeholder="Password" onkeydown="if(event.key==='Enter')tryLogin()"/>
+    <div class="login-err" id="loginErr">Wrong password. Try again.</div>
+    <button class="btn btn-blue" style="width:100%;justify-content:center" onclick="tryLogin()">Sign In →</button>
+  </div>
+</div>
+
+<!-- APP -->
+<div id="app">
+  <div class="topbar">
+    <span class="topbar-logo">PRUDHVI<span class="dot">.</span> Admin</span>
+    <div class="topbar-right">
+      <a href="blog.html" target="_blank">View Blog ↗</a>
+      <a href="index.html" target="_blank">Portfolio ↗</a>
+      <button class="btn btn-ghost" style="padding:7px 16px;font-size:.82rem" onclick="logout()">Logout</button>
+    </div>
+  </div>
+  <div class="wrap">
+    <!-- SIDEBAR -->
+    <div class="sidebar">
+      <div class="sidebar-head">
+        <h2>Posts</h2>
+        <span id="postCount" style="font-size:.78rem;color:var(--muted);font-family:var(--mono)"></span>
+      </div>
+      <button class="btn btn-new" onclick="newPost()">+ New Post</button>
+      <div class="post-list" id="postList"></div>
+    </div>
+    <!-- EDITOR -->
+    <div class="editor-area" id="editorArea">
+      <div style="text-align:center;padding:80px 24px;color:var(--muted)">
+        <div style="font-size:3rem;margin-bottom:16px">✍️</div>
+        <h3 style="color:var(--text);margin-bottom:8px">Select a post to edit</h3>
+        <p>or click <strong style="color:var(--accent2)">+ New Post</strong> to write something new</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="blogs-data.js"></script>
+<script>
+const PASS = 'prudhvi2025';
+let blogs = [], currentId = null;
+
+// ---- AUTH ----
+function tryLogin() {
+  const val = document.getElementById('pwInput').value;
+  if (val === PASS) {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    initAdmin();
+  } else {
+    const err = document.getElementById('loginErr');
+    err.style.display = 'block';
+    setTimeout(()=>err.style.display='none', 2500);
+  }
+}
+function logout() {
+  document.getElementById('loginScreen').style.display = 'flex';
+  document.getElementById('app').style.display = 'none';
+  document.getElementById('pwInput').value = '';
+}
+
+// ---- DATA ----
+function loadBlogs() {
+  const stored = localStorage.getItem('prudhvi_blogs');
+  if (stored) return JSON.parse(stored);
+  const seed = window.BLOGS_SEED || [];
+  localStorage.setItem('prudhvi_blogs', JSON.stringify(seed));
+  return seed;
+}
+function saveBlogs() {
+  localStorage.setItem('prudhvi_blogs', JSON.stringify(blogs));
+}
+function slugify(str) {
+  return str.toLowerCase().replace(/[^a-z0-9]+/g,'-').replace(/^-|-$/g,'');
+}
+
+// ---- SIDEBAR ----
+function renderSidebar() {
+  const list = document.getElementById('postList');
+  document.getElementById('postCount').textContent = blogs.length + ' posts';
+  if (!blogs.length) { list.innerHTML = '<div class="sidebar-empty">No posts yet.</div>'; return; }
+  const sorted = [...blogs].sort((a,b)=>new Date(b.dateISO)-new Date(a.dateISO));
+  list.innerHTML = sorted.map(p=>`
+    <div class="post-item ${p.id===currentId?'active':''}" onclick="editPost('${p.id}')">
+      <div style="display:flex;align-items:flex-start">
+        <div style="flex:1">
+          <div class="post-item-title">${p.title||'Untitled'}</div>
+          <div class="post-item-meta">
+            <span>${p.category||'—'}</span>
+            <span>${p.date||'—'}</span>
+          </div>
+        </div>
+        <button class="post-item-del" onclick="event.stopPropagation();deletePost('${p.id}')" title="Delete">✕</button>
+      </div>
+    </div>`).join('');
+}
+
+// ---- EDITOR ----
+function renderEditor(post) {
+  document.getElementById('editorArea').innerHTML = `
+    <div class="action-bar">
+      <h2 class="editor-title">${post.id ? 'Edit Post' : 'New Post'}</h2>
+      <div style="margin-left:auto;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+        <span class="save-status" id="saveStatus">✓ Saved</span>
+        <a href="blog-post.html?id=${post.id}" target="_blank" class="btn btn-ghost" style="padding:9px 18px;font-size:.82rem" ${post.id?'':'style="pointer-events:none;opacity:.4"'}>Preview ↗</a>
+        <button class="btn btn-blue" onclick="savePost()">Save &amp; Publish</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Title</label>
+      <input id="fTitle" value="${esc(post.title)}" placeholder="Your article title..." oninput="autoSlug()" style="font-size:1.1rem;font-weight:600"/>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label>Category</label>
+        <select id="fCategory">
+          ${['Freelancing','Web Dev','Video Edit','Behind the Build','Social Media','Branding'].map(c=>`<option ${post.category===c?'selected':''}>${c}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field">
+        <label>Read Time</label>
+        <input id="fReadTime" value="${esc(post.readTime)}" placeholder="5 min"/>
+      </div>
+      <div class="field">
+        <label>Date (Display)</label>
+        <input id="fDate" value="${esc(post.date)}" placeholder="Jan 2025"/>
+      </div>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label>Date ISO (for sorting)</label>
+        <input id="fDateISO" type="date" value="${post.dateISO||new Date().toISOString().slice(0,10)}"/>
+      </div>
+      <div class="field field-full" style="grid-column:2/-1">
+        <label>Slug / ID</label>
+        <input id="fId" value="${esc(post.id)}" placeholder="auto-generated-from-title" style="font-family:var(--mono);font-size:.88rem"/>
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Excerpt (shown in cards)</label>
+      <textarea id="fExcerpt" rows="2" placeholder="Short description shown in article cards...">${esc(post.excerpt)}</textarea>
+    </div>
+
+    <div class="field">
+      <label>Article Content</label>
+      <div class="editor-toolbar">
+        <button class="tb-btn" onclick="fmt('bold')" title="Bold"><b>B</b></button>
+        <button class="tb-btn" onclick="fmt('italic')" title="Italic"><i>I</i></button>
+        <button class="tb-btn" onclick="fmt('underline')" title="Underline"><u>U</u></button>
+        <div class="tb-sep"></div>
+        <button class="tb-btn" onclick="fmtBlock('h2')" title="Heading 2">H2</button>
+        <button class="tb-btn" onclick="fmtBlock('h3')" title="Heading 3">H3</button>
+        <button class="tb-btn" onclick="fmt('formatBlock','p')" title="Paragraph">P</button>
+        <div class="tb-sep"></div>
+        <button class="tb-btn" onclick="fmt('insertUnorderedList')" title="Bullet List">• List</button>
+        <button class="tb-btn" onclick="fmt('insertOrderedList')" title="Numbered List">1. List</button>
+        <div class="tb-sep"></div>
+        <button class="tb-btn" onclick="fmtBlock('blockquote')" title="Blockquote">" Quote</button>
+        <button class="tb-btn" onclick="wrapCode()" title="Inline Code">Code</button>
+        <div class="tb-sep"></div>
+        <button class="tb-btn" onclick="insertLink()" title="Link">🔗 Link</button>
+        <button class="tb-btn" onclick="fmt('removeFormat')" title="Clear Format">✕ Clear</button>
+      </div>
+      <div class="content-editable" id="richEditor" contenteditable="true">${post.content||''}</div>
+      <div class="char-count" id="charCount">0 words</div>
+    </div>
+
+    <div class="action-bar" style="padding-bottom:40px">
+      <button class="btn btn-green" onclick="savePost()">✓ Save &amp; Publish</button>
+      <button class="btn btn-ghost" onclick="if(confirm('Delete this post?'))deletePost('${post.id}')">Delete Post</button>
+      <span class="save-status" id="saveStatus2"></span>
+    </div>`;
+
+  // word count
+  const editor = document.getElementById('richEditor');
+  editor.addEventListener('input', ()=>{
+    const words = editor.innerText.trim().split(/\s+/).filter(Boolean).length;
+    document.getElementById('charCount').textContent = words + ' words · ~' + Math.max(1,Math.ceil(words/200)) + ' min read';
+  });
+  editor.dispatchEvent(new Event('input'));
+}
+
+function fmt(cmd, val) { document.execCommand(cmd, false, val||null); document.getElementById('richEditor').focus(); }
+function fmtBlock(tag) { document.execCommand('formatBlock', false, tag); document.getElementById('richEditor').focus(); }
+function wrapCode() {
+  const sel = window.getSelection();
+  if (!sel.rangeCount) return;
+  const range = sel.getRangeAt(0);
+  const code = document.createElement('code');
+  try { range.surroundContents(code); } catch(e) {}
+  document.getElementById('richEditor').focus();
+}
+function insertLink() {
+  const url = prompt('Enter URL:');
+  if (url) fmt('createLink', url);
+}
+function autoSlug() {
+  const t = document.getElementById('fTitle').value;
+  document.getElementById('fId').value = slugify(t);
+}
+function esc(s){ return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  // ---- CRUD ----
+  function newPost() {
+    currentId = null;
+    renderEditor({ id:'', title:'', category:'Freelancing', readTime:'5 min', date: new Date().toLocaleDateString('en-US',{month:'short',year:'numeric'}), dateISO: new Date().toISOString().slice(0,10), excerpt:'', content:'' });
+    renderSidebar();
+  }
+
+  function editPost(id) {
+    currentId = id;
+    const post = blogs.find(b=>b.id===id);
+    if (post) renderEditor(post);
+    renderSidebar();
+  }
+
+  function savePost() {
+    const id = document.getElementById('fId').value.trim() || slugify(document.getElementById('fTitle').value);
+    if (!id) { showToast('Add a title first', true); return; }
+    const post = {
+      id,
+      title: document.getElementById('fTitle').value.trim(),
+      category: document.getElementById('fCategory').value,
+      readTime: document.getElementById('fReadTime').value.trim(),
+      date: document.getElementById('fDate').value.trim(),
+      dateISO: document.getElementById('fDateISO').value,
+      excerpt: document.getElementById('fExcerpt').value.trim(),
+      cover: '',
+      content: document.getElementById('richEditor').innerHTML
+    };
+    showToast('Saving...');
+    BlogDB.save(post, function(ok, source) {
+      const idx = blogs.findIndex(b=>b.id===id);
+      if (idx>-1) blogs[idx]=post; else blogs.push(post);
+      currentId = id;
+      renderSidebar();
+      const msg = source === 'firebase' ? '✓ Synced to Firebase!' : '✓ Saved locally';
+      showToast(msg);
+      ['saveStatus','saveStatus2'].forEach(el=>{ const e=document.getElementById(el); if(e){e.textContent=msg;e.classList.add('show');setTimeout(()=>e.classList.remove('show'),2500); }});
+    });
+  }
+
+  function deletePost(id) {
+    BlogDB.delete(id, function() {
+      blogs = blogs.filter(b=>b.id!==id);
+      currentId = null;
+      document.getElementById('editorArea').innerHTML = '<div style="text-align:center;padding:80px 24px;color:var(--muted)"><div style="font-size:3rem;margin-bottom:16px">🗑️</div><p>Post deleted.</p></div>';
+      renderSidebar();
+      showToast('Post deleted');
+    });
+  }
+
+function showToast(msg, err=false) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = 'toast' + (err?' error':'') + ' show';
+  setTimeout(()=>t.classList.remove('show'), 3000);
+}
+
+  function initAdmin() {
+    BlogDB.getAll(function(posts) {
+      blogs = posts;
+      renderSidebar();
+    });
+  }
+</script>
+</body>
+</html>
