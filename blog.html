@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1.0"/>
+  <title>Blog — Prudhvi</title>
+  <meta name="description" content="Thoughts on freelancing, web development, video editing, and building things solo by Prudhvi."/>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+  <link rel="stylesheet" href="style.css"/>
+  <script src="blogs-data.js"></script>
+  <script src="firebase-config.js"></script>
+  <script src="firebase-blog.js"></script>
+  <style>
+    .blog-hero{padding:140px 24px 60px;text-align:center}
+    .blog-hero h1{font-size:clamp(2.5rem,6vw,4.5rem);font-weight:900;letter-spacing:-3px;margin-bottom:16px}
+    .blog-hero p{color:var(--muted);font-size:1.1rem}
+    .blog-filter{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin:40px 0 32px}
+    .blog-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:24px;padding-bottom:100px}
+    .blog-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;transition:all .3s;cursor:pointer;color:inherit;display:block}
+    .blog-card:hover{transform:translateY(-6px);box-shadow:0 20px 60px rgba(0,0,0,0.4);border-color:rgba(29,110,245,0.3)}
+    .blog-card-cover{height:190px;background:linear-gradient(135deg,var(--c1,#1d6ef5),var(--c2,#0ea5e9));display:flex;align-items:center;justify-content:center;font-size:3.5rem;position:relative;overflow:hidden}
+    .blog-card-cover::before{content:'';position:absolute;inset:0;background:rgba(0,0,0,.25)}
+    .blog-card-cover span{position:relative;z-index:1}
+    .blog-card-cover img{width:100%;height:100%;object-fit:cover}
+    .blog-card-body{padding:22px}
+    .blog-card-meta{display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap}
+    .blog-card-cat{color:var(--accent2);font-size:.75rem;font-weight:600;text-transform:uppercase;letter-spacing:1px}
+    .blog-card-meta span{color:var(--muted);font-size:.75rem;font-family:var(--mono)}
+    .blog-card-body h2{font-size:1.05rem;font-weight:700;margin-bottom:8px;line-height:1.4}
+    .blog-card-body p{color:var(--muted);font-size:.88rem;line-height:1.6;margin-bottom:14px}
+    .blog-card-link{color:var(--accent2);font-size:.85rem;font-weight:600}
+    .empty-state{text-align:center;padding:80px 24px;color:var(--muted);grid-column:1/-1}
+    .empty-state h3{font-size:1.5rem;margin-bottom:8px;color:var(--text)}
+    .blog-count{color:var(--muted);font-size:.82rem;font-family:var(--mono);text-align:center;margin-bottom:28px}
+  </style>
+</head>
+<body>
+  <div class="noise"></div>
+
+  <!-- ARTICLE OVERLAY -->
+  <div class="article-overlay" id="articleOverlay" role="dialog" aria-modal="true">
+    <div class="article-overlay-inner">
+      <div class="article-overlay-nav">
+        <button class="overlay-back" onclick="closeArticle()">
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M19 12H5M12 5l-7 7 7 7"/></svg>
+          Back to Blog
+        </button>
+        <div class="overlay-actions">
+          <button class="overlay-share-btn" id="overlayCopyBtn" onclick="copyArticleLink()">Copy Link</button>
+          <button class="overlay-close" onclick="closeArticle()">&#x2715;</button>
+        </div>
+      </div>
+      <div class="article-overlay-content" id="articleContent"></div>
+    </div>
+  </div>
+
+  <nav class="nav scrolled">
+    <div class="nav-inner">
+      <a href="index.html" class="nav-logo">PRUDHVI<span class="dot">.</span></a>
+      <ul class="nav-links">
+        <li><a href="index.html#about" class="nav-link">About</a></li>
+        <li><a href="index.html#projects" class="nav-link">Projects</a></li>
+        <li><a href="blog.html" class="nav-link" style="color:var(--text)">Blog</a></li>
+        <li><a href="index.html#contact" class="nav-link">Contact</a></li>
+      </ul>
+      <a href="index.html#contact" class="nav-cta">Let's Work</a>
+    </div>
+  </nav>
+
+  <div class="blog-hero">
+    <div class="section-label" style="justify-content:center;display:flex">— Notes from the Desk</div>
+    <h1>Writing<span class="gradient-text">.</span></h1>
+    <p>Thoughts on freelancing, web dev, video editing, and building things solo.</p>
+  </div>
+
+  <div class="container">
+    <div class="blog-filter" id="blogFilter"><button class="filter-btn active" data-cat="all">All</button></div>
+    <p class="blog-count" id="blogCount"></p>
+    <div class="blog-grid" id="blogGrid"></div>
+  </div>
+
+  <footer class="footer">
+    <div class="container footer-inner">
+      <a href="index.html" class="nav-logo">PRUDHVI<span class="dot">.</span></a>
+      <div class="footer-links">
+        <a href="index.html">Portfolio</a>
+        <a href="index.html#contact">Contact</a>
+      </div>
+      <p class="footer-copy">© 2025 Prudhvi · growinnerself.ai · Just One Life</p>
+    </div>
+  </footer>
+
+  <script>
+    const CAT_COLORS = {
+      "Freelancing":"#1d6ef5,#0ea5e9","Web Dev":"#0891b2,#1d6ef5","Video Edit":"#7c3aed,#4f46e5",
+      "Behind the Build":"#f97316,#eab308","Social Media":"#db2777,#9333ea","Branding":"#10b981,#0891b2"
+    };
+    const CAT_EMOJI = {"Freelancing":"💼","Web Dev":"🌐","Video Edit":"🎬","Behind the Build":"🚀","Social Media":"📱","Branding":"🎨","default":"✍️"};
+
+    let blogs = [], activeCat = 'all', _currentPostId = null;
+
+    function openArticle(id) {
+      const post = blogs.find(p => p.id === id);
+      if (!post) return;
+      _currentPostId = id;
+      const colors = (CAT_COLORS[post.category] || '#1d6ef5,#38bdf8').split(',');
+      const coverHTML = post.cover
+        ? `<img src="${post.cover}" alt="${post.title}" class="ov-cover-img" />`
+        : `<div class="ov-cover-emoji" style="--c1:${colors[0]};--c2:${colors[1]}">${CAT_EMOJI[post.category] || '✍️'}</div>`;
+      document.getElementById('articleContent').innerHTML = `
+        ${coverHTML}
+        <div class="ov-meta">
+          <span class="ov-cat">${post.category}</span>
+          <span>${post.readTime} read</span>
+          <span>${post.date}</span>
+        </div>
+        <h1 class="ov-title">${post.title}</h1>
+        <div class="ov-divider"></div>
+        <div class="ov-body">${post.content}</div>
+        <div class="ov-share">
+          <p>Found this useful? Share it.</p>
+          <div class="ov-share-btns">
+            <a href="https://twitter.com/intent/tweet?text=${encodeURIComponent(post.title)}&url=${encodeURIComponent(location.href)}" target="_blank" rel="noopener">Twitter / X</a>
+            <a href="https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(location.href)}" target="_blank" rel="noopener">LinkedIn</a>
+            <button onclick="copyArticleLink()">Copy Link</button>
+          </div>
+        </div>`;
+      const overlay = document.getElementById('articleOverlay');
+      overlay.scrollTop = 0;
+      overlay.classList.add('open');
+      document.body.classList.add('overlay-open');
+      history.pushState({ articleId: id }, '', '#' + id);
+    }
+
+    function closeArticle() {
+      document.getElementById('articleOverlay').classList.remove('open');
+      document.body.classList.remove('overlay-open');
+      _currentPostId = null;
+      if (history.state && history.state.articleId) history.back();
+    }
+
+    function copyArticleLink() {
+      navigator.clipboard.writeText(location.href).then(() => {
+        const btn = document.getElementById('overlayCopyBtn');
+        if (btn) { btn.textContent = 'Copied!'; setTimeout(() => btn.textContent = 'Copy Link', 2000); }
+      });
+    }
+
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') closeArticle(); });
+    window.addEventListener('popstate', e => {
+      if (!e.state || !e.state.articleId) {
+        document.getElementById('articleOverlay').classList.remove('open');
+        document.body.classList.remove('overlay-open');
+      }
+    });
+
+    function buildFilters(posts) {
+      const cats = ['all', ...new Set(posts.map(b => b.category))];
+      const el = document.getElementById('blogFilter');
+      el.innerHTML = cats.map(c => `<button class="filter-btn ${c==='all'?'active':''}" data-cat="${c}">${c==='all'?'All':c}</button>`).join('');
+      el.querySelectorAll('.filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          el.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          activeCat = btn.dataset.cat;
+          renderGrid();
+        });
+      });
+    }
+
+    function renderGrid() {
+      const grid = document.getElementById('blogGrid');
+      const countEl = document.getElementById('blogCount');
+      const filtered = activeCat === 'all' ? blogs : blogs.filter(b => b.category === activeCat);
+      const sorted = [...filtered].sort((a,b) => new Date(b.dateISO) - new Date(a.dateISO));
+      countEl.textContent = `${sorted.length} article${sorted.length !== 1 ? 's' : ''}`;
+      if (!sorted.length) {
+        grid.innerHTML = `<div class="empty-state"><h3>No posts yet</h3><p>Check back soon.</p></div>`;
+        return;
+      }
+      grid.innerHTML = sorted.map(b => {
+        const cs = (CAT_COLORS[b.category] || '#1d6ef5,#38bdf8').split(',');
+        const coverHTML = b.cover ? `<img src="${b.cover}" alt="${b.title}" />` : `<span>${CAT_EMOJI[b.category] || '✍️'}</span>`;
+        return `
+          <div class="blog-card" style="--c1:${cs[0]};--c2:${cs[1]}" onclick="openArticle('${b.id}')">
+            <div class="blog-card-cover">${coverHTML}</div>
+            <div class="blog-card-body">
+              <div class="blog-card-meta">
+                <span class="blog-card-cat">${b.category}</span>
+                <span>${b.readTime} read</span>
+                <span>${b.date}</span>
+              </div>
+              <h2>${b.title}</h2>
+              <p>${b.excerpt}</p>
+              <span class="blog-card-link">Read Article →</span>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    buildFilters([]);
+    BlogDB.getAll(function(posts) {
+      blogs = posts;
+      buildFilters(posts);
+      renderGrid();
+    });
+  </script>
+</body>
+</html>
